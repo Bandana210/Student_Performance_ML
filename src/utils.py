@@ -7,6 +7,7 @@ from sklearn.metrics import r2_score
 
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import GridSearchCV
 
 def save_object(file_path, obj):
     try:
@@ -19,21 +20,45 @@ def save_object(file_path, obj):
     except Exception as e:
         raise CustomException(e, sys)
 
-def evaluate_models(X_train, y_train, X_test, y_test, models):
+
+def evaluate_models(X_train, y_train, X_test, y_test, models, param):
     try:
         report = {}
 
-        for i in range(len(list(models.keys()))):
-            model = list(models.values())[i]
-            model.fit(X_train, y_train) # train model
+        for model_name, model in models.items():
 
+            # Get hyperparameters for the current model
+            para = param[model_name]
+
+            # Perform Grid Search
+            gs = GridSearchCV(
+                estimator=model,
+                param_grid=para,
+                cv=3,
+                scoring='r2',
+                n_jobs=4,
+                verbose=1
+            )
+
+            # Find the best hyperparameters
+            gs.fit(X_train, y_train)
+
+            # Get the model with the best parameters
+            model.set_params(**gs.best_params_)
+
+            # Train the model using the complete training data
+            model.fit(X_train, y_train)
+
+            # Make predictions
             y_train_pred = model.predict(X_train)
             y_test_pred = model.predict(X_test)
 
+            # Calculate R2 scores
             train_model_score = r2_score(y_train, y_train_pred)
             test_model_score = r2_score(y_test, y_test_pred)
 
-            report[list(models.keys())[i]] = test_model_score
+            # Store test score
+            report[model_name] = test_model_score
 
         return report
 
